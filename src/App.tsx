@@ -3,7 +3,7 @@ import { fetchForecast, SPB_CENTER, type Coords, type Forecast } from './lib/api
 import { kvGet, kvSet } from './lib/db';
 import { ALERT_P, BASE_RATE, LEVEL_LABEL, TYPE_LABEL, pct } from './lib/predict';
 import { riskWindows, upcoming, windowEndLabel, type RiskWindow } from './lib/series';
-import { LOOKAHEAD_HOURS, maybeNotify } from './lib/notify';
+import { BANNER_LOOKAHEAD, maybeNotify } from './lib/notify';
 import { clock, hhmm, relDay } from './format';
 import { Hero, scalePos } from './components/Hero';
 import { Timeline } from './components/Timeline';
@@ -127,7 +127,7 @@ export default function App() {
   const hours = useMemo(() => (forecast ? upcoming(forecast, now) : []), [forecast, now]);
   const today = forecast ? new Date(now + forecast.utcOffsetSeconds * 1000).toISOString().slice(0, 10) : '';
   const windows = useMemo(() => riskWindows(hours), [hours]);
-  const alert = windows.find((w) => w.startIndex < LOOKAHEAD_HOURS);
+  const alert = windows.find((w) => w.startIndex < BANNER_LOOKAHEAD);
 
   const selIdx = Math.max(0, selectedTime ? hours.findIndex((h) => h.time === selectedTime) : 0);
   const selected = hours[selIdx];
@@ -152,7 +152,7 @@ export default function App() {
     // Фоновая проверка: Chrome на Android для установленного PWA
     const periodic = (reg as (ServiceWorkerRegistration & { periodicSync?: { register: (tag: string, o: object) => Promise<void> } }) | undefined)?.periodicSync;
     try {
-      await periodic?.register('fog-check', { minInterval: 3 * 60 * 60_000 });
+      await periodic?.register('fog-check', { minInterval: 2 * 60 * 60_000 });
     } catch {
       // браузер не дал разрешение на periodic sync — останутся проверки при открытии
     }

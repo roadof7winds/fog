@@ -8,8 +8,12 @@ export type FogType = 'radiation' | 'advection' | 'mixed' | 'none';
 /** Средняя доля часов с туманом в Пулково за 2015–2026 — точка отсчёта «обычного» */
 export const BASE_RATE = MODEL.baseRate;
 
-/** Порог оповещения: на проверочных годах даёт лучший CSI (0.155) */
-export const ALERT_P = 0.08;
+/**
+ * Порог оповещения. На проверочных годах даёт 137 уведомлений в год, из них
+ * с туманом каждое шестое, и ловит 61% туманов. Порог лучшего CSI был бы 8%,
+ * но тогда пропускалось бы больше половины.
+ */
+export const ALERT_P = 0.05;
 
 export interface Contribution {
   group: Group;
@@ -53,7 +57,8 @@ export const TYPE_HINT: Record<FogType, string> = {
 };
 
 export function levelOf(p: number): Level {
-  if (p >= ALERT_P) return 'veryHigh';
+  // Шкала уровней не привязана к порогу тревоги: это разные вещи
+  if (p >= 0.08) return 'veryHigh';
   if (p >= 0.03) return 'high';
   if (p >= 0.01) return 'moderate';
   return 'low';
