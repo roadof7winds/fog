@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { CALIBRATION_SITE, SPB_CENTER, type Coords } from '../lib/api';
 import { MODEL } from '../lib/model';
 import { ALERT_P } from '../lib/predict';
+import { distanceKm } from '../lib/geo';
 
 export type NotifState = NotificationPermission | 'unsupported';
 
@@ -17,14 +18,7 @@ interface Props {
 
 const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
-/** Расстояние по большому кругу, км */
-function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
-  const rad = Math.PI / 180;
-  const dLat = (b.lat - a.lat) * rad;
-  const dLon = (b.lon - a.lon) * rad;
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.sqrt(s));
-}
+
 
 export function Settings({ coords, onCoords, notif, onEnableNotif, standalone, canInstall, onInstall }: Props) {
   const [geoBusy, setGeoBusy] = useState(false);

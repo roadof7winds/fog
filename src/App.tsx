@@ -9,6 +9,9 @@ import { Hero, scalePos } from './components/Hero';
 import { Timeline } from './components/Timeline';
 import { HourList } from './components/HourList';
 import { Settings, type NotifState } from './components/Settings';
+import { Observed } from './components/Observed';
+import { fetchObservations, OBS_SITE, type Observations } from './lib/observations';
+import { distanceKm } from './lib/geo';
 
 type Status = 'loading' | 'ok' | 'offline' | 'error';
 
@@ -37,10 +40,24 @@ export default function App() {
   const [now, setNow] = useState(Date.now());
   const [notif, setNotif] = useState<NotifState>(notifSupported ? Notification.permission : 'unsupported');
   const [installEvt, setInstallEvt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [obs, setObs] = useState<Observations | null>(null);
 
   // Сохранённое место
   useEffect(() => {
     kvGet<Coords>('coords').then((c) => setCoords(c ?? SPB_CENTER));
+  }, []);
+
+  // Факт с метеостанции грузим отдельно: если он недоступен, прогноз всё равно нужен
+  const loadObs = useCallback(async () => {
+    const cached = await kvGet<Observations>('obs');
+    if (cached) setObs(cached);
+    try {
+      const o = await fetchObservations(2);
+      setObs(o);
+      await kvSet('obs', o);
+    } catch {
+      // архив наблюдений недоступен — панель просто покажет последнее сохранённое
+    }
   }, []);
 
   const load = useCallback(async (c: Coords) => {
@@ -69,6 +86,10 @@ export default function App() {
     if (coords) load(coords);
   }, [coords, load]);
 
+  useEffect(() => {
+    loadObs();
+  }, [loadObs]);
+
   // Обновление по таймеру и при возвращении в приложение
   useEffect(() => {
     if (!coords) return;
@@ -78,8 +99,12 @@ export default function App() {
       if (document.visibilityState !== 'visible') return;
       setNow(Date.now());
       load(coords);
+      loadObs();
     };
-    const onOnline = () => load(coords);
+    const onOnline = () => {
+      load(coords);
+      loadObs();
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
     return () => {
@@ -88,7 +113,7 @@ export default function App() {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onOnline);
     };
-  }, [coords, load]);
+  }, [coords, load, loadObs]);
 
   useEffect(() => {
     const onPrompt = (e: Event) => {
@@ -196,6 +221,8 @@ export default function App() {
               <Timeline hours={hours} selected={selIdx} onSelect={select} />
               <RiskList windows={windows} today={today} onSelect={select} />
             </section>
+
+            {obs && coords && <Observed obs={obs} distanceKm={distanceKm(coords, OBS_SITE)} today={today} />}
 
             <section className="panel">
               <h2>По часам</h2>

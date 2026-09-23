@@ -563,3 +563,48 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
   font-weight: 600;
   color: var(--ink-2);
 }
+
+/* ── Факт со станции ───────────────────────────── */
+.obs-now {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+}
+.obs-now.obs-fog {
+  border-color: color-mix(in srgb, var(--lamp) 55%, transparent);
+  background: var(--lamp-bg);
+}
+.obs-vis {
+  font-size: 26px;
+  font-weight: 300;
+  white-space: nowrap;
+}
+.obs-meta { min-width: 0; }
+.obs-cond { font-weight: 700; }
+.obs-cond::first-letter { text-transform: uppercase; }
+.obs-meta .muted { font-size: 12px; }
+
+.spells {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.spells li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border-left: 4px solid var(--l-veryHigh);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  font-size: 14px;
+}
+.spell-when { font-weight: 600; }
+.spell-when::first-letter { text-transform: uppercase; }
+.spell-vis { white-space: nowrap; color: var(--ink-2); }
