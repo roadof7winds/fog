@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { SPB_CENTER, type Coords } from '../lib/api';
+import { CALIBRATION_SITE, SPB_CENTER, type Coords } from '../lib/api';
+import { MODEL } from '../lib/model';
+import { ALERT_P } from '../lib/predict';
 
 export type NotifState = NotificationPermission | 'unsupported';
 
@@ -14,6 +16,15 @@ interface Props {
 }
 
 const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+/** Расстояние по большому кругу, км */
+function distanceKm(a: { lat: number; lon: number }, b: { lat: number; lon: number }): number {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLon = (b.lon - a.lon) * rad;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLon / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(s));
+}
 
 export function Settings({ coords, onCoords, notif, onEnableNotif, standalone, canInstall, onInstall }: Props) {
   const [geoBusy, setGeoBusy] = useState(false);
@@ -95,13 +106,22 @@ export function Settings({ coords, onCoords, notif, onEnableNotif, standalone, c
         </button>
       </form>
       {geoError && <p className="error">{geoError}</p>}
-      <p className="fine">Правило «ветер с залива» (ЮЗ–З, 200–280°) рассчитано на Петербург; для других мест оно условно.</p>
+      <p className="fine">
+        Модель обучена на наблюдениях аэропорта Пулково ({CALIBRATION_SITE.lat}, {CALIBRATION_SITE.lon}) — это единственная точка
+        рядом с городом, где измеряют видимость. Выбранное место в {Math.round(distanceKm(coords, CALIBRATION_SITE))} км от него:
+        {distanceKm(coords, CALIBRATION_SITE) > 60
+          ? ' там туман образуется по другим правилам, и оценке верить нельзя.'
+          : ' условия близкие, но у воды и в низинах туман бывает чаще, чем на Пулковских высотах.'}
+      </p>
 
       <h2>Уведомления</h2>
       {notif === 'granted' && <p className="muted">Включены. Сообщу, когда в ближайшие 12 часов вероятность дойдёт до высокой.</p>}
       {notif === 'default' && (
         <>
-          <p className="muted">Сообщу, когда в ближайшие 12 часов вероятность тумана дойдёт до высокой (55%+).</p>
+          <p className="muted">
+            Сообщу, когда в ближайшие 12 часов вероятность тумана дойдёт до {Math.round(ALERT_P * 100)}% — это примерно
+            в {Math.round(ALERT_P / MODEL.baseRate)} раз выше обычного.
+          </p>
           <button className="btn" onClick={onEnableNotif}>
             Включить уведомления
           </button>
@@ -114,6 +134,11 @@ export function Settings({ coords, onCoords, notif, onEnableNotif, standalone, c
         ) : (
           <p className="muted">Этот браузер не поддерживает уведомления. Остаётся алерт на главном экране.</p>
         ))}
+      <p className="fine">
+        Проверено на наблюдениях 2023–2026, которых модель не видела: из всех предупреждений верными оказываются около
+        каждого пятого, а поймать удаётся примерно половину туманов (AUC {MODEL.aucTest}). Туман плохо прогнозируется в
+        принципе — это уровень научных методик, а не недоработка.
+      </p>
       <p className="fine">
         Сервера нет, поэтому проверка идёт при открытии приложения, а на Android у установленного приложения ещё и в фоне, раз в несколько часов (как часто, решает браузер).
       </p>

@@ -1,4 +1,4 @@
-import { LEVEL_LABEL, TYPE_HINT, TYPE_LABEL, compass, explain, num, type HourScore } from '../lib/fog';
+import { ALERT_P, BASE_RATE, LEVEL_LABEL, TYPE_HINT, TYPE_LABEL, compass, explain, num, pct, type HourScore } from '../lib/predict';
 import { hhmm, relDay, visibilityText } from '../format';
 
 interface Props {
@@ -8,9 +8,19 @@ interface Props {
   onBack: () => void;
 }
 
+/** «в 8 раз выше обычного» — без этого маленький процент читается как «тумана не будет» */
+export function ratioText(ratio: number): string {
+  if (ratio < 0.7) return 'реже обычного';
+  if (ratio < 1.5) return 'как обычно в это время года';
+  const r = Math.round(ratio);
+  const mod10 = r % 10;
+  const mod100 = r % 100;
+  const word = mod10 === 1 && mod100 !== 11 ? 'раз' : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'раза' : 'раз';
+  return `в ${r} ${word} выше обычного`;
+}
+
 export function Hero({ h, current, today, onBack }: Props) {
-  const typeText =
-    h.type !== 'none' ? `${TYPE_LABEL[h.type]} туман` : h.level === 'low' ? 'туман не ожидается' : 'тип не выражен';
+  const typeText = h.type !== 'none' ? `${TYPE_LABEL[h.type]} туман` : h.level === 'low' ? 'туман маловероятен' : 'тип не выражен';
 
   return (
     <section className={`hero lvl-${h.level}`} aria-live="polite">
@@ -24,18 +34,19 @@ export function Hero({ h, current, today, onBack }: Props) {
       </div>
 
       <div className="hero-main">
-        <div className="pct" aria-label={`Вероятность тумана ${h.score} процентов`}>
-          <span className="pct-n">{h.score}</span>
+        <div className="pct" aria-label={`Вероятность тумана ${pct(h.p)} процентов`}>
+          <span className="pct-n">{pct(h.p)}</span>
           <span className="pct-u">%</span>
         </div>
         <div className="hero-side">
           <div className="level">{LEVEL_LABEL[h.level]}</div>
+          <div className="ratio">{ratioText(h.ratio)}</div>
           <div className="type">{typeText}</div>
           {h.type !== 'none' && <div className="type-hint">{TYPE_HINT[h.type]}</div>}
         </div>
       </div>
 
-      <Scale score={h.score} />
+      <Scale p={h.p} />
 
       <p className="why">{explain(h)}</p>
 
@@ -69,29 +80,35 @@ export function Hero({ h, current, today, onBack }: Props) {
       </dl>
 
       <details className="breakdown">
-        <summary>Из чего сложился балл</summary>
+        <summary>Что повлияло на оценку</summary>
         <ul>
-          {h.factors.map((f) => (
-            <li key={f.key} className={f.points > 0 ? 'pos' : f.points < 0 ? 'neg' : 'zero'}>
-              <span className="pts">{f.points > 0 ? `+${f.points}` : f.points < 0 ? `−${-f.points}` : '0'}</span>
-              <span>{f.label}</span>
+          {h.contributions.map((c) => (
+            <li key={c.group} className={c.value > 0 ? 'pos' : 'neg'}>
+              <span className="pts">{c.value > 0 ? '↑' : '↓'}</span>
+              <span>{c.text}</span>
             </li>
           ))}
         </ul>
-        <p className="fine">* Видимость — модельная оценка Open-Meteo, в балл не входит.</p>
+        <p className="fine">
+          * Видимость — модельная оценка Open-Meteo, в расчёт не входит. Вероятность считает модель, обученная на
+          наблюдениях Пулково; обычная частота тумана там — {pct(BASE_RATE)}% часов, тревога начинается с {Math.round(ALERT_P * 100)}%.
+        </p>
       </details>
     </section>
   );
 }
 
-function Scale({ score }: { score: number }) {
+/** Шкала логарифмическая: иначе всё интересное сжато у нуля */
+export const scalePos = (p: number) => Math.min(1, Math.max(0, Math.log10(Math.max(p, 0.001) / 0.001) / Math.log10(0.35 / 0.001)));
+
+function Scale({ p }: { p: number }) {
   return (
     <div className="scale" aria-hidden>
-      <div className="scale-seg lvl-low" style={{ flexBasis: '30%' }} />
-      <div className="scale-seg lvl-moderate" style={{ flexBasis: '25%' }} />
-      <div className="scale-seg lvl-high" style={{ flexBasis: '20%' }} />
-      <div className="scale-seg lvl-veryHigh" style={{ flexBasis: '25%' }} />
-      <div className="scale-mark" style={{ left: `${score}%` }} />
+      <div className="scale-seg lvl-low" style={{ flexBasis: `${100 * scalePos(0.01)}%` }} />
+      <div className="scale-seg lvl-moderate" style={{ flexBasis: `${100 * (scalePos(0.03) - scalePos(0.01))}%` }} />
+      <div className="scale-seg lvl-high" style={{ flexBasis: `${100 * (scalePos(ALERT_P) - scalePos(0.03))}%` }} />
+      <div className="scale-seg lvl-veryHigh" style={{ flexBasis: `${100 * (1 - scalePos(ALERT_P))}%` }} />
+      <div className="scale-mark" style={{ left: `${100 * scalePos(p)}%` }} />
     </div>
   );
 }

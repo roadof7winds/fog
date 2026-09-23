@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchForecast, SPB_CENTER, type Coords, type Forecast } from './lib/api';
 import { kvGet, kvSet } from './lib/db';
-import { LEVEL_LABEL, TYPE_LABEL, riskWindows, upcoming, windowEndLabel, type RiskWindow } from './lib/fog';
+import { ALERT_P, BASE_RATE, LEVEL_LABEL, TYPE_LABEL, pct } from './lib/predict';
+import { riskWindows, upcoming, windowEndLabel, type RiskWindow } from './lib/series';
 import { LOOKAHEAD_HOURS, maybeNotify } from './lib/notify';
 import { clock, hhmm, relDay } from './format';
-import { Hero } from './components/Hero';
+import { Hero, scalePos } from './components/Hero';
 import { Timeline } from './components/Timeline';
 import { HourList } from './components/HourList';
 import { Settings, type NotifState } from './components/Settings';
@@ -108,7 +109,7 @@ export default function App() {
   const select = (i: number) => setSelectedTime(i === 0 ? null : hours[i].time);
 
   // Плотность «тумана» на фоне следует за выбранным часом
-  const density = selected ? 0.12 + (selected.score / 100) * 0.88 : 0.3;
+  const density = selected ? 0.12 + scalePos(selected.p) * 0.88 : 0.3;
 
   async function changeCoords(c: Coords) {
     setCoords(c);
@@ -217,8 +218,9 @@ export default function App() {
         )}
 
         <footer className="foot">
-          Данные: <a href="https://open-meteo.com/">Open-Meteo.com</a> (CC BY 4.0). Вероятность — эвристическая оценка по
-          точке росы, ветру, влажности и облачности, а не официальный прогноз.
+          Прогноз: <a href="https://open-meteo.com/">Open-Meteo.com</a> (CC BY 4.0). Вероятность считает модель, обученная
+          на наблюдениях аэропорта Пулково за 2015–2026 (<a href="https://mesonet.agron.iastate.edu/request/download.phtml">IEM</a>).
+          Это не официальный прогноз.
         </footer>
       </main>
     </>
@@ -238,7 +240,7 @@ function AlertBanner({ w, today, onSelect }: { w: RiskWindow; today: string; onS
           {LEVEL_LABEL[w.peak.level]} вероятность тумана {when}
         </strong>
         <span>
-          до {windowEndLabel(w)} · пик {w.peak.score}% в {hhmm(w.peak.time)}
+          до {windowEndLabel(w)} · пик {pct(w.peak.p)}% в {hhmm(w.peak.time)}
           {w.peak.type !== 'none' ? ` · ${TYPE_LABEL[w.peak.type]}` : ''}
         </span>
       </span>
@@ -247,7 +249,8 @@ function AlertBanner({ w, today, onSelect }: { w: RiskWindow; today: string; onS
 }
 
 function RiskList({ windows, today, onSelect }: { windows: RiskWindow[]; today: string; onSelect: (i: number) => void }) {
-  if (!windows.length) return <p className="muted risk-none">Окон высокой вероятности (55%+) в эти часы нет.</p>;
+  if (!windows.length)
+    return <p className="muted risk-none">Часов с вероятностью выше {Math.round(ALERT_P * 100)}% впереди нет. Обычная частота тумана — {pct(BASE_RATE)}% часов.</p>;
   return (
     <ul className="risks">
       {windows.map((w) => (
@@ -259,7 +262,7 @@ function RiskList({ windows, today, onSelect }: { windows: RiskWindow[]; today: 
                 {hhmm(w.start.time)}–{windowEndLabel(w)}
               </span>
             </span>
-            <span className="risk-peak">до {w.peak.score}%</span>
+            <span className="risk-peak">до {pct(w.peak.p)}%</span>
             <span className="risk-type">{w.peak.type !== 'none' ? TYPE_LABEL[w.peak.type] : `${w.length} ч`}</span>
           </button>
         </li>

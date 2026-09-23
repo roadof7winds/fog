@@ -272,7 +272,7 @@ h1 {
   color: var(--ink);
 }
 .pct-n {
-  font-size: clamp(96px, 30vw, 148px);
+  font-size: clamp(72px, 24vw, 124px);
   font-weight: 200;
   letter-spacing: -0.05em;
 }
@@ -556,3 +556,10 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 }
 
 .nowrap { white-space: nowrap; }
+
+.ratio {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}

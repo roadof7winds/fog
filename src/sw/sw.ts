@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { fetchForecast, SPB_CENTER, type Coords } from '../lib/api';
 import { kvGet, kvSet } from '../lib/db';
-import { upcoming } from '../lib/fog';
+import { upcoming } from '../lib/series';
 import { maybeNotify } from '../lib/notify';
 
 declare const __BUILD__: string;

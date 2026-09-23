@@ -1,6 +1,6 @@
-import { TYPE_LABEL, compass, num, type HourScore } from '../lib/fog';
+import { TYPE_LABEL, compass, num, pct, type HourScore } from '../lib/predict';
 import { hhmm, relDay } from '../format';
-import { WindArrow } from './Hero';
+import { WindArrow, scalePos } from './Hero';
 
 interface Props {
   hours: HourScore[];
@@ -18,9 +18,9 @@ export function HourList({ hours, selected, today, onSelect }: Props) {
           <button className={`hour lvl-${h.level}${i === selected ? ' sel' : ''}`} onClick={() => onSelect(i)}>
             <span className="hour-t">{hhmm(h.time)}</span>
             <span className="hour-bar">
-              <span style={{ width: `${Math.max(h.score, 2)}%` }} />
+              <span style={{ width: `${Math.max(100 * scalePos(h.p), 1)}%` }} />
             </span>
-            <span className="hour-p">{h.score}%</span>
+            <span className="hour-p">{pct(h.p)}%</span>
             <span className="hour-meta">
               <span>Δ{num(Math.max(h.spread, 0))}°</span>
               <span>
