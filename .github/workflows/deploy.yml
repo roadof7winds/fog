@@ -22,7 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22.18+ умеет импортировать .ts напрямую — на этом держатся тесты и скрипты калибровки
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run build
