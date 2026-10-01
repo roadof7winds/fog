@@ -41,6 +41,8 @@ export interface HourScore extends HourRaw {
   month: number;
   /** во сколько раз вероятнее обычного */
   ratio: number;
+  /** число уточнено фактом со станции */
+  nowcast?: boolean;
   contributions: Contribution[];
 }
 

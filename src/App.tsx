@@ -12,6 +12,7 @@ import { Settings, type NotifState } from './components/Settings';
 import { Observed } from './components/Observed';
 import { fetchObservations, OBS_SITE, type Observations } from './lib/observations';
 import { distanceKm } from './lib/geo';
+import { applyNowcast, STATE_TEXT } from './lib/nowcast';
 
 type Status = 'loading' | 'ok' | 'offline' | 'error';
 
@@ -124,10 +125,15 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', onPrompt);
   }, []);
 
-  const { hours, currentIndex } = useMemo(
-    () => (forecast ? series(forecast, now) : { hours: [], currentIndex: 0 }),
-    [forecast, now],
-  );
+  const raw = useMemo(() => (forecast ? series(forecast, now) : { hours: [], currentIndex: 0 }), [forecast, now]);
+  // Факт со станции знает то, чего не знает ни одна модель погоды: что туман
+  // уже идёт. Поправка действует на ближайшие часы.
+  const { hours, nowcastInfo } = useMemo(() => {
+    if (!obs || !coords) return { hours: raw.hours, nowcastInfo: null };
+    const r = applyNowcast(raw.hours, obs.rows, coords, forecast?.utcOffsetSeconds ?? 0, now);
+    return { hours: r.hours, nowcastInfo: r.info };
+  }, [raw.hours, obs, coords, forecast, now]);
+  const currentIndex = raw.currentIndex;
   const today = forecast ? new Date(now + forecast.utcOffsetSeconds * 1000).toISOString().slice(0, 10) : '';
   // окна риска считаем только по будущему, прошедшие часы в тревогу не идут
   const windows = useMemo(() => riskWindows(hours.slice(currentIndex)), [hours, currentIndex]);
@@ -204,6 +210,12 @@ export default function App() {
 
         {status === 'offline' && (
           <p className="notice">Нет сети — показываю сохранённый прогноз{stale ? ', он уже устарел' : ''}.</p>
+        )}
+
+        {nowcastInfo && nowcastInfo.adjusted > 0 && (
+          <p className="notice nowcast-note">
+            Ближайшие часы уточнены фактом: {STATE_TEXT[nowcastInfo.state]} ({nowcastInfo.obsTime.slice(11, 16)}).
+          </p>
         )}
 
         {alert && <AlertBanner w={alert} today={today} onSelect={select} />}

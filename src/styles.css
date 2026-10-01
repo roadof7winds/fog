@@ -646,3 +646,15 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 }
 .member-bar span { display: block; height: 100%; background: var(--ink-3); border-radius: 3px; }
 .member-p { text-align: right; font-weight: 600; }
+
+.nowcast-note {
+  border-left: 3px solid var(--lamp);
+}
+.nowcast-tag {
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--lamp-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}

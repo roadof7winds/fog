@@ -44,6 +44,7 @@ export function Hero({ h, current, past, today, onBack }: Props) {
         </div>
         <div className="hero-side">
           <div className="level">{LEVEL_LABEL[h.level]}</div>
+          {h.nowcast && <div className="nowcast-tag">уточнено фактом станции</div>}
           <div className="ratio">{ratioText(h.ratio)}</div>
           <div className="type">{typeText}</div>
           {h.type !== 'none' && <div className="type-hint">{TYPE_HINT[h.type]}</div>}

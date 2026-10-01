@@ -9,7 +9,7 @@
     "build": "npm run typecheck && npm test && vite build && vite build -c vite.sw.config.ts",
     "preview": "vite preview --host",
     "icons": "node scripts/gen-icons.mjs",
-    "test": "node scripts/test-notify.mjs"
+    "test": "node scripts/test-notify.mjs && node scripts/test-nowcast.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",
