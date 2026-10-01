@@ -1,9 +1,11 @@
-import { ALERT_P, BASE_RATE, LEVEL_LABEL, TYPE_HINT, TYPE_LABEL, compass, explain, num, pct, type HourScore } from '../lib/predict';
+import { ALERT_P, BASE_RATE, LEVEL_LABEL, TYPE_HINT, TYPE_LABEL, compass, disagrees, explain, num, pct, type HourScore } from '../lib/predict';
+import { MODEL_LABEL } from '../lib/api';
 import { hhmm, relDay, visibilityText } from '../format';
 
 interface Props {
   h: HourScore;
   current: boolean;
+  past: boolean;
   today: string;
   onBack: () => void;
 }
@@ -19,13 +21,15 @@ export function ratioText(ratio: number): string {
   return `в ${r} ${word} выше обычного`;
 }
 
-export function Hero({ h, current, today, onBack }: Props) {
+export function Hero({ h, current, past, today, onBack }: Props) {
   const typeText = h.type !== 'none' ? `${TYPE_LABEL[h.type]} туман` : h.level === 'low' ? 'туман маловероятен' : 'тип не выражен';
 
   return (
     <section className={`hero lvl-${h.level}`} aria-live="polite">
       <div className="hero-when">
-        <span>{current ? `Сейчас · ${hhmm(h.time)}` : `${relDay(h.time, today)}, ${hhmm(h.time)}`}</span>
+        <span>
+          {current ? `Сейчас · ${hhmm(h.time)}` : `${past ? 'было ' : ''}${relDay(h.time, today)}, ${hhmm(h.time)}`}
+        </span>
         {!current && (
           <button className="link" onClick={onBack}>
             ← к текущему часу
@@ -49,6 +53,13 @@ export function Hero({ h, current, today, onBack }: Props) {
       <Scale p={h.p} />
 
       <p className="why">{explain(h)}</p>
+
+      {disagrees(h) && (
+        <p className="disagree">
+          Модели погоды расходятся: от {pct(h.pMin)}% до {pct(h.pMax)}%. Туман локален, и часть моделей его не видит —
+          показано среднее.
+        </p>
+      )}
 
       <dl className="metrics">
         <div>
@@ -89,8 +100,21 @@ export function Hero({ h, current, today, onBack }: Props) {
             </li>
           ))}
         </ul>
+        {h.members.length > 1 && (
+          <ul className="members">
+            {h.members.map((m) => (
+              <li key={m.model}>
+                <span className="member-name">{MODEL_LABEL[m.model]}</span>
+                <span className="member-bar">
+                  <span style={{ width: `${Math.max(100 * scalePos(m.p), 1)}%` }} />
+                </span>
+                <span className="member-p">{pct(m.p)}%</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <p className="fine">
-          * Видимость — модельная оценка Open-Meteo, в расчёт не входит. Вероятность считает модель, обученная на
+          * Видимость — самая низкая из моделей, в расчёт не входит. Вероятность считает модель, обученная на
           наблюдениях Пулково; обычная частота тумана там — {pct(BASE_RATE)}% часов, тревога начинается с {Math.round(ALERT_P * 100)}%.
         </p>
       </details>

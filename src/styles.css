@@ -465,8 +465,8 @@ h1 {
   font-size: 12px;
   font-weight: 700;
   color: var(--ink-2);
-  text-transform: capitalize;
 }
+.hours-day::first-letter { text-transform: uppercase; }
 .hours li:first-child .hours-day { margin-top: 0; }
 .hour {
   display: grid;
@@ -608,3 +608,41 @@ button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visibl
 .spell-when { font-weight: 600; }
 .spell-when::first-letter { text-transform: uppercase; }
 .spell-vis { white-space: nowrap; color: var(--ink-2); }
+
+/* ── Прошедшие часы и расхождение моделей ──────── */
+.bar.past { opacity: 0.4; }
+.hour.past { opacity: 0.55; }
+
+.disagree {
+  margin: -6px 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--lamp-bg);
+  border: 1px solid color-mix(in srgb, var(--lamp) 40%, transparent);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.members {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+.members li {
+  display: grid;
+  grid-template-columns: 96px 1fr 44px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.member-name { color: var(--ink-2); }
+.member-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  overflow: hidden;
+}
+.member-bar span { display: block; height: 100%; background: var(--ink-3); border-radius: 3px; }
+.member-p { text-align: right; font-weight: 600; }

@@ -1,17 +1,34 @@
 import type { Forecast } from './api.ts';
-import { ALERT_P, predictHour, type HourScore } from './predict.ts';
+import { ALERT_P, predictEnsemble, type HourScore } from './predict.ts';
 
-/** Часы начиная с текущего (по местному времени точки прогноза) */
-export function upcoming(f: Forecast, now = Date.now(), count = 48): HourScore[] {
+export interface Series {
+  hours: HourScore[];
+  /** индекс текущего часа: до него — уже прошедшие */
+  currentIndex: number;
+}
+
+/**
+ * Ряд часов вокруг текущего. Прошедшие часы нужны не для красоты: туман чаще
+ * всего под утро, и, открыв приложение днём, человек иначе видит только ноль
+ * и не понимает, что утром оценка была высокой.
+ */
+export function series(f: Forecast, now = Date.now(), back = 6, count = 48): Series {
   const nowLocal = now + f.utcOffsetSeconds * 1000;
-  let start = f.hours.findLastIndex((h) => Date.parse(`${h.time}:00Z`) <= nowLocal);
-  if (start < 0) start = 0;
-  const out: HourScore[] = [];
-  for (let i = start; i < Math.min(f.hours.length, start + count); i++) {
-    // три часа назад нужны для тренда; в начале массива их может не быть
-    out.push(predictHour(f.hours[i], i >= 3 ? f.hours[i - 3] : undefined));
+  let current = f.hours.findLastIndex((h) => Date.parse(`${h.time}:00Z`) <= nowLocal);
+  if (current < 0) current = 0;
+  const from = Math.max(0, current - back);
+  const hours: HourScore[] = [];
+  for (let i = from; i < Math.min(f.hours.length, current + count); i++) {
+    // три часа назад нужны для трендов; в начале массива их может не быть
+    hours.push(predictEnsemble(f.hours[i], i >= 3 ? f.hours[i - 3] : undefined));
   }
-  return out;
+  return { hours, currentIndex: current - from };
+}
+
+/** Только будущее — для уведомлений */
+export function upcoming(f: Forecast, now = Date.now(), count = 48): HourScore[] {
+  const s = series(f, now, 0, count);
+  return s.hours;
 }
 
 export interface RiskWindow {
@@ -48,4 +65,9 @@ export function riskWindows(hours: HourScore[], threshold = ALERT_P): RiskWindow
 export function windowEndLabel(w: RiskWindow): string {
   const h = (w.end.hourOfDay + 1) % 24;
   return `${String(h).padStart(2, '0')}:00`;
+}
+
+/** Окно может переходить через полночь — тогда конец относится к следующему дню */
+export function windowCrossesMidnight(w: RiskWindow): boolean {
+  return w.end.hourOfDay + 1 >= 24 || w.end.time.slice(0, 10) !== w.start.time.slice(0, 10);
 }

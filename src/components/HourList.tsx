@@ -5,17 +5,23 @@ import { WindArrow, scalePos } from './Hero';
 interface Props {
   hours: HourScore[];
   selected: number;
+  currentIndex: number;
   today: string;
   onSelect: (i: number) => void;
 }
 
-export function HourList({ hours, selected, today, onSelect }: Props) {
+export function HourList({ hours, selected, currentIndex, today, onSelect }: Props) {
   return (
     <ol className="hours">
       {hours.map((h, i) => (
         <li key={h.time}>
-          {(i === 0 || h.hourOfDay === 0) && <div className="hours-day">{relDay(h.time, today)}</div>}
-          <button className={`hour lvl-${h.level}${i === selected ? ' sel' : ''}`} onClick={() => onSelect(i)}>
+          {i === 0 && currentIndex > 0 && <div className="hours-day">Уже прошло</div>}
+          {i === currentIndex && <div className="hours-day">{relDay(h.time, today)}, сейчас</div>}
+          {i !== currentIndex && i > 0 && h.hourOfDay === 0 && <div className="hours-day">{relDay(h.time, today)}</div>}
+          <button
+            className={`hour lvl-${h.level}${i === selected ? ' sel' : ''}${i < currentIndex ? ' past' : ''}`}
+            onClick={() => onSelect(i)}
+          >
             <span className="hour-t">{hhmm(h.time)}</span>
             <span className="hour-bar">
               <span style={{ width: `${Math.max(100 * scalePos(h.p), 1)}%` }} />

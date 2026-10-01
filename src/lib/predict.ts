@@ -1,4 +1,4 @@
-import type { HourRaw } from './api.ts';
+import type { HourMembers, HourRaw, ModelId } from './api.ts';
 import { FEATURES, featureVector, type FeatureInput, type Group } from './features.ts';
 import { MODEL } from './model.ts';
 
@@ -22,9 +22,18 @@ export interface Contribution {
   text: string;
 }
 
-export interface HourScore extends HourRaw {
-  /** вероятность тумана 0–1 */
+export interface Member {
+  model: ModelId;
   p: number;
+}
+
+export interface HourScore extends HourRaw {
+  /** вероятность тумана 0–1: среднее по моделям погоды */
+  p: number;
+  /** что сказала каждая модель — расхождение само по себе информация */
+  members: Member[];
+  pMin: number;
+  pMax: number;
   level: Level;
   type: FogType;
   spread: number;
@@ -157,6 +166,82 @@ export function toFeatureInput(h: HourRaw, prev3: HourRaw | undefined): FeatureI
   };
 }
 
+/** Вероятность по одному источнику данных (одна модель погоды или реанализ) */
+export function predictOne(h: HourRaw, prev3: HourRaw | undefined): number {
+  const f = toFeatureInput(h, prev3);
+  const z = featureVector(f).map((x, i) => (x - MODEL.mean[i]) / MODEL.std[i]);
+  return calibrate(sigmoid(z.reduce((acc, x, i) => acc + x * MODEL.w[i], MODEL.b)));
+}
+
+/** Среднее направление ветра: градусы нельзя усреднять арифметически */
+function meanDir(dirs: number[]): number {
+  const rad = Math.PI / 180;
+  const x = dirs.reduce((a, d) => a + Math.cos(d * rad), 0) / dirs.length;
+  const y = dirs.reduce((a, d) => a + Math.sin(d * rad), 0) / dirs.length;
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+/**
+ * Вероятность по всем моделям сразу. Числа усредняются, поля для показа — тоже,
+ * поэтому объяснение описывает «среднюю» погоду; когда модели расходятся,
+ * приложение показывает разброс отдельно.
+ */
+export function predictEnsemble(hm: HourMembers, prev?: HourMembers): HourScore {
+  const members: Member[] = hm.members.map(({ model, h }) => ({
+    model,
+    p: predictOne(h, prev?.members.find((m) => m.model === model)?.h),
+  }));
+  const hs = hm.members.map((m) => m.h);
+  const pick = <T,>(get: (h: HourRaw) => T | null | undefined): T[] => hs.map(get).filter((v): v is T => v != null && !Number.isNaN(v));
+  const avg = (get: (h: HourRaw) => number) => mean(hs.map(get));
+  const vis = pick((h) => h.visibility);
+
+  const averaged: HourRaw = {
+    time: hm.time,
+    temp: avg((h) => h.temp),
+    rh: avg((h) => h.rh),
+    dew: avg((h) => h.dew),
+    wind: avg((h) => h.wind),
+    windDir: meanDir(hs.map((h) => h.windDir)),
+    cloud: avg((h) => h.cloud),
+    cloudLow: null,
+    precip: pick((h) => h.precip).length ? mean(pick((h) => h.precip)) : null,
+    gust: pick((h) => h.gust).length ? mean(pick((h) => h.gust)) : null,
+    swr: pick((h) => h.swr).length ? mean(pick((h) => h.swr)) : null,
+    soilT: null,
+    // видимость показываем самую низкую: это предупреждение, а не средняя погода
+    visibility: vis.length ? Math.min(...vis) : null,
+  };
+
+  const prevAveraged = prev && prev.members.length ? predictEnsembleFields(prev) : undefined;
+  const score = predictHour(averaged, prevAveraged);
+  const ps = members.map((m) => m.p);
+  const p = ps.length ? mean(ps) : score.p;
+  return { ...score, p, level: levelOf(p), ratio: p / BASE_RATE, members, pMin: Math.min(...ps), pMax: Math.max(...ps) };
+}
+
+/** Усреднённые поля прошлого часа — нужны для трендов */
+function predictEnsembleFields(hm: HourMembers): HourRaw {
+  const hs = hm.members.map((m) => m.h);
+  return {
+    time: hm.time,
+    temp: mean(hs.map((h) => h.temp)),
+    rh: mean(hs.map((h) => h.rh)),
+    dew: mean(hs.map((h) => h.dew)),
+    wind: mean(hs.map((h) => h.wind)),
+    windDir: meanDir(hs.map((h) => h.windDir)),
+    cloud: mean(hs.map((h) => h.cloud)),
+    cloudLow: null,
+    precip: null,
+    gust: null,
+    swr: null,
+    soilT: null,
+    visibility: null,
+  };
+}
+
 export function predictHour(h: HourRaw, prev3: HourRaw | undefined): HourScore {
   const f = toFeatureInput(h, prev3);
   const vec = featureVector(f);
@@ -183,6 +268,9 @@ export function predictHour(h: HourRaw, prev3: HourRaw | undefined): HourScore {
   return {
     ...h,
     p,
+    members: [],
+    pMin: p,
+    pMax: p,
     level: levelOf(p),
     type,
     spread,
@@ -192,6 +280,9 @@ export function predictHour(h: HourRaw, prev3: HourRaw | undefined): HourScore {
     contributions,
   };
 }
+
+/** Насколько модели расходятся — показываем, когда разброс заметный */
+export const disagrees = (h: HourScore) => h.members.length > 1 && h.pMax - h.pMin >= 0.05 && h.pMax >= 0.03;
 
 /** Строка «почему» из самых весомых факторов */
 export function explain(h: HourScore): string {

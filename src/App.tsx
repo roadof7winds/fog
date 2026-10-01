@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchForecast, SPB_CENTER, type Coords, type Forecast } from './lib/api';
 import { kvGet, kvSet } from './lib/db';
 import { ALERT_P, BASE_RATE, LEVEL_LABEL, TYPE_LABEL, pct } from './lib/predict';
-import { riskWindows, upcoming, windowEndLabel, type RiskWindow } from './lib/series';
+import { riskWindows, series, upcoming, windowCrossesMidnight, windowEndLabel, type RiskWindow } from './lib/series';
 import { BANNER_LOOKAHEAD, maybeNotify } from './lib/notify';
 import { clock, hhmm, relDay } from './format';
 import { Hero, scalePos } from './components/Hero';
@@ -124,14 +124,20 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', onPrompt);
   }, []);
 
-  const hours = useMemo(() => (forecast ? upcoming(forecast, now) : []), [forecast, now]);
+  const { hours, currentIndex } = useMemo(
+    () => (forecast ? series(forecast, now) : { hours: [], currentIndex: 0 }),
+    [forecast, now],
+  );
   const today = forecast ? new Date(now + forecast.utcOffsetSeconds * 1000).toISOString().slice(0, 10) : '';
-  const windows = useMemo(() => riskWindows(hours), [hours]);
+  // окна риска считаем только по будущему, прошедшие часы в тревогу не идут
+  const windows = useMemo(() => riskWindows(hours.slice(currentIndex)), [hours, currentIndex]);
   const alert = windows.find((w) => w.startIndex < BANNER_LOOKAHEAD);
 
-  const selIdx = Math.max(0, selectedTime ? hours.findIndex((h) => h.time === selectedTime) : 0);
+  const foundIdx = selectedTime ? hours.findIndex((h) => h.time === selectedTime) : -1;
+  const selIdx = foundIdx >= 0 ? foundIdx : currentIndex;
   const selected = hours[selIdx];
-  const select = (i: number) => setSelectedTime(i === 0 ? null : hours[i].time);
+  const select = (i: number) => setSelectedTime(i === currentIndex ? null : hours[i].time);
+  const selectUpcoming = (i: number) => select(currentIndex + i);
 
   // Плотность «тумана» на фоне следует за выбранным часом
   const density = selected ? 0.12 + scalePos(selected.p) * 0.88 : 0.3;
@@ -214,19 +220,34 @@ export default function App() {
 
         {selected && (
           <>
-            <Hero h={selected} current={selIdx === 0} today={today} onBack={() => select(0)} />
+            <Hero
+              h={selected}
+              current={selIdx === currentIndex}
+              past={selIdx < currentIndex}
+              today={today}
+              onBack={() => select(currentIndex)}
+            />
 
             <section className="panel">
-              <h2>Ближайшие {hours.length} ч</h2>
-              <Timeline hours={hours} selected={selIdx} onSelect={select} />
-              <RiskList windows={windows} today={today} onSelect={select} />
+              <h2>Ближайшие {hours.length - currentIndex} ч</h2>
+              <Timeline hours={hours} selected={selIdx} currentIndex={currentIndex} onSelect={select} />
+              <RiskList windows={windows} today={today} onSelect={selectUpcoming} />
             </section>
 
             {obs && coords && <Observed obs={obs} distanceKm={distanceKm(coords, OBS_SITE)} today={today} />}
 
             <section className="panel">
               <h2>По часам</h2>
-              <HourList hours={hours} selected={selIdx} today={today} onSelect={(i) => { select(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+              <HourList
+                hours={hours}
+                selected={selIdx}
+                currentIndex={currentIndex}
+                today={today}
+                onSelect={(i) => {
+                  select(i);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
             </section>
           </>
         )}
@@ -284,10 +305,15 @@ function RiskList({ windows, today, onSelect }: { windows: RiskWindow[]; today: 
         <li key={w.start.time}>
           <button className={`risk lvl-${w.peak.level}`} onClick={() => onSelect(w.peakIndex)}>
             <span className="risk-when">
-              {relDay(w.start.time, today)},{' '}
-              <span className="nowrap">
-                {hhmm(w.start.time)}–{windowEndLabel(w)}
-              </span>
+              {relDay(w.start.time, today)}, <span className="nowrap">{hhmm(w.start.time)}</span>
+              {windowCrossesMidnight(w) ? (
+                <>
+                  {' – '}
+                  {relDay(w.end.time, today)}, <span className="nowrap">{windowEndLabel(w)}</span>
+                </>
+              ) : (
+                <span className="nowrap">–{windowEndLabel(w)}</span>
+              )}
             </span>
             <span className="risk-peak">до {pct(w.peak.p)}%</span>
             <span className="risk-type">{w.peak.type !== 'none' ? TYPE_LABEL[w.peak.type] : `${w.length} ч`}</span>

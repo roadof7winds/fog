@@ -6,10 +6,11 @@ import { hhmm, weekdayShort } from '../format';
 interface Props {
   hours: HourScore[];
   selected: number;
+  currentIndex: number;
   onSelect: (i: number) => void;
 }
 
-export function Timeline({ hours, selected, onSelect }: Props) {
+export function Timeline({ hours, selected, currentIndex, onSelect }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   // Держим выбранный столбик в зоне видимости
@@ -34,14 +35,16 @@ export function Timeline({ hours, selected, onSelect }: Props) {
             <button
               role="option"
               aria-selected={i === selected}
-              className={`bar lvl-${h.level}${i === selected ? ' sel' : ''}`}
+              className={`bar lvl-${h.level}${i === selected ? ' sel' : ''}${i < currentIndex ? ' past' : ''}`}
               onClick={() => onSelect(i)}
               aria-label={`${hhmm(h.time)}: ${pct(h.p)}%${h.type !== 'none' ? `, ${TYPE_LABEL[h.type]}` : ''}`}
             >
               <span className="bar-track">
                 <span className="bar-fill" style={{ height: `${Math.max(100 * scalePos(h.p), 2)}%` }} />
               </span>
-              <span className="bar-h">{i === 0 ? 'сейч' : h.hourOfDay % 3 === 0 ? String(h.hourOfDay).padStart(2, '0') : ''}</span>
+              <span className="bar-h">
+                {i === currentIndex ? 'сейч' : h.hourOfDay % 3 === 0 ? String(h.hourOfDay).padStart(2, '0') : ''}
+              </span>
             </button>
           </Fragment>
         ))}
