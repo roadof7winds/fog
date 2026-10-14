@@ -10,6 +10,7 @@ import { Timeline } from './components/Timeline';
 import { HourList } from './components/HourList';
 import { Settings, type NotifState } from './components/Settings';
 import { Observed } from './components/Observed';
+import { TrackRecord } from './components/TrackRecord';
 import { fetchObservations, OBS_SITE, type Observations } from './lib/observations';
 import { distanceKm } from './lib/geo';
 import { applyNowcast, STATE_TEXT } from './lib/nowcast';
@@ -297,6 +298,8 @@ export default function App() {
             </section>
 
             {obs && coords && <Observed obs={obs} distanceKm={distanceKm(coords, OBS_SITE)} today={today} />}
+
+            <TrackRecord />
 
             <section className="panel">
               <h2>По часам</h2>

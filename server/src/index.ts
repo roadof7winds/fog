@@ -14,6 +14,7 @@ import { applyNowcast } from '../../src/lib/nowcast.ts';
 import { BASE_RATE, LEVEL_LABEL, TYPE_LABEL, pct } from '../../src/lib/predict.ts';
 import { riskWindows, series, windowEndLabel } from '../../src/lib/series.ts';
 import { localHourAt, slotFor } from '../../src/lib/slots.ts';
+import { recordEnsemble, recordForecast, recordObservations, summary } from './journal.ts';
 
 export interface Env {
   SUBS: KVNamespace;
@@ -51,6 +52,14 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors() });
 
     if (url.pathname === '/health') return json({ ok: true });
+
+    // Журнал: что обещали и что сбылось. Считается по станции Пулково —
+    // только там есть чем проверять.
+    if (url.pathname === '/stats') {
+      const days = Math.min(90, Math.max(1, Number(url.searchParams.get('days') ?? 30)));
+      const threshold = Math.min(0.5, Math.max(0.01, Number(url.searchParams.get('threshold') ?? 0.05)));
+      return json(await summary(env, days, threshold));
+    }
 
     if (url.pathname === '/subscribe' && request.method === 'POST') {
       const body = (await request.json()) as Partial<Record_>;
@@ -97,6 +106,7 @@ export default {
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(run(env));
+    ctx.waitUntil(keepJournal(env));
   },
 };
 
@@ -170,6 +180,20 @@ async function run(env: Env): Promise<void> {
     }
   }
   console.log('рассылка:', JSON.stringify(stats));
+}
+
+/** Журнал ведём каждый час; ансамбль тянем раз в сутки — ответ большой */
+async function keepJournal(env: Env): Promise<void> {
+  const now = Date.now();
+  const stats: Record<string, number | string> = {};
+  try {
+    stats.прогноз = await recordForecast(env, now);
+    stats.факт = await recordObservations(env);
+    if (new Date(now).getUTCHours() === 3) stats.ансамбль = await recordEnsemble(env, now);
+  } catch (e) {
+    stats.ошибка = e instanceof Error ? e.message : String(e);
+  }
+  console.log('журнал:', JSON.stringify(stats));
 }
 
 async function send(env: Env, subscription: WebPushSubscription, payload: object): Promise<void> {
