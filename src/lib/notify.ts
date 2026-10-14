@@ -2,26 +2,12 @@ import type { Coords } from './api.ts';
 import { kvGet, kvSet } from './db.ts';
 import { BASE_RATE, TYPE_LABEL, pct, type HourScore } from './predict.ts';
 import { riskWindows, windowEndLabel } from './series.ts';
+import { slotFor } from './slots.ts';
+
+export { slotFor, type Slot } from './slots.ts';
 
 /** На сколько часов вперёд смотрит плашка на главном экране */
 export const BANNER_LOOKAHEAD = 12;
-
-/**
- * Туман почти всегда ночью и под утро, поэтому уведомления приходят не в момент
- * пересечения порога, а в два окна: вечером — про ближайшую ночь, утром —
- * повтор, если риск ещё впереди.
- */
-export interface Slot {
-  kind: 'evening' | 'morning';
-  /** сколько ближайших часов проверяем */
-  lookahead: number;
-}
-
-export function slotFor(localHour: number): Slot | null {
-  if (localHour >= 20 && localHour <= 23) return { kind: 'evening', lookahead: 14 };
-  if (localHour >= 7 && localHour < 9) return { kind: 'morning', lookahead: 6 };
-  return null;
-}
 
 const placeKey = (c: Coords) => `${c.lat.toFixed(2)},${c.lon.toFixed(2)}`;
 

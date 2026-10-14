@@ -1,0 +1,20 @@
+name = "fog-push"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Раз в час: сервер сам решает, у кого из подписчиков наступило окно доставки
+[triggers]
+crons = ["0 * * * *"]
+
+# Хранилище подписок. ID подставится командой:
+#   npx wrangler kv namespace create SUBS
+[[kv_namespaces]]
+binding = "SUBS"
+id = "ЗАМЕНИТЬ_НА_ID_ИЗ_КОМАНДЫ_ВЫШЕ"
+
+[vars]
+VAPID_PUBLIC_KEY = "BEi9jogWRp-Av7cPB1DT03Ehl3x7WyhyC7fBRkQJ6VBWnTpDjvVRwEixnQhPxBMLMMfRJStHDz91ye4qAZadJvM"
+VAPID_SUBJECT = "mailto:roadof7winds@gmail.com"
+
+# Приватный ключ задаётся отдельно и в репозиторий не попадает:
+#   npx wrangler secret put VAPID_PRIVATE_KEY

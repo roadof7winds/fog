@@ -13,6 +13,7 @@ import { Observed } from './components/Observed';
 import { fetchObservations, OBS_SITE, type Observations } from './lib/observations';
 import { distanceKm } from './lib/geo';
 import { applyNowcast, STATE_TEXT } from './lib/nowcast';
+import { disablePush, enablePush, pushEnabled, pushSupported, sendTestPush, updatePushPlace } from './lib/push';
 
 type Status = 'loading' | 'ok' | 'offline' | 'error';
 
@@ -42,6 +43,9 @@ export default function App() {
   const [notif, setNotif] = useState<NotifState>(notifSupported ? Notification.permission : 'unsupported');
   const [installEvt, setInstallEvt] = useState<BeforeInstallPromptEvent | null>(null);
   const [obs, setObs] = useState<Observations | null>(null);
+  const [push, setPush] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
 
   // Сохранённое место
   useEffect(() => {
@@ -90,6 +94,16 @@ export default function App() {
   useEffect(() => {
     loadObs();
   }, [loadObs]);
+
+  useEffect(() => {
+    if (pushSupported()) pushEnabled().then(setPush);
+  }, []);
+
+  // Место сменилось — подписку надо переоформить, иначе сервер будет считать
+  // прогноз для старой точки
+  useEffect(() => {
+    if (push && coords && forecast) updatePushPlace(coords, forecast.utcOffsetSeconds).catch(() => undefined);
+  }, [push, coords, forecast]);
 
   // Обновление по таймеру и при возвращении в приложение
   useEffect(() => {
@@ -169,6 +183,42 @@ export default function App() {
       // браузер не дал разрешение на periodic sync — останутся проверки при открытии
     }
     if (hours.length && coords) await maybeNotify(hours, coords, showNotification);
+  }
+
+  async function togglePush(on: boolean) {
+    if (!coords || !forecast) return;
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      if (on) {
+        const permission = await Notification.requestPermission();
+        setNotif(permission);
+        if (permission !== 'granted') {
+          setPushBusy(false);
+          return;
+        }
+        await enablePush(coords, forecast.utcOffsetSeconds);
+      } else {
+        await disablePush();
+      }
+      setPush(on);
+    } catch (e) {
+      setPushError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function testPush() {
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      await sendTestPush();
+    } catch (e) {
+      setPushError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPushBusy(false);
+    }
   }
 
   async function install() {
@@ -271,6 +321,11 @@ export default function App() {
             onCoords={changeCoords}
             notif={notif}
             onEnableNotif={enableNotif}
+            push={push}
+            pushBusy={pushBusy}
+            pushError={pushError}
+            onTogglePush={togglePush}
+            onTestPush={testPush}
             standalone={standalone}
             canInstall={!!installEvt}
             onInstall={install}

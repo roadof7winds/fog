@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023", "WebWorker"],
+    "lib": [
+      "ES2023",
+      "WebWorker"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
@@ -11,5 +14,11 @@
     "noUnusedLocals": true,
     "types": []
   },
-  "include": ["src/sw", "src/lib"]
+  "include": [
+    "src/sw",
+    "src/lib"
+  ],
+  "exclude": [
+    "src/lib/push.ts"
+  ]
 }

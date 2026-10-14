@@ -86,6 +86,31 @@ sw.addEventListener('periodicsync', (e) => {
   if (ev.tag === 'fog-check') ev.waitUntil(backgroundCheck().catch(() => undefined));
 });
 
+// Push от сервера рассылки: всё содержимое уже посчитано там
+sw.addEventListener('push', (e) => {
+  const event = e as PushEvent;
+  event.waitUntil(
+    (async () => {
+      let title = 'Туман';
+      let body = 'Откройте приложение, чтобы увидеть прогноз';
+      try {
+        const data = event.data?.json() as { title?: string; body?: string } | undefined;
+        if (data?.title) title = data.title;
+        if (data?.body) body = data.body;
+      } catch {
+        // payload не разобрался — покажем общее сообщение, молчать нельзя:
+        // браузер иначе сам покажет «сайт обновился в фоне»
+      }
+      await sw.registration.showNotification(title, {
+        body,
+        tag: 'fog-alert',
+        icon: 'icons/icon-192.png',
+        badge: 'icons/icon-192.png',
+      });
+    })(),
+  );
+});
+
 sw.addEventListener('notificationclick', (e) => {
   e.notification.close();
   e.waitUntil(

@@ -3,6 +3,7 @@ import { CALIBRATION_SITE, SPB_CENTER, type Coords } from '../lib/api';
 import { MODEL } from '../lib/model';
 import { ALERT_P } from '../lib/predict';
 import { distanceKm } from '../lib/geo';
+import { pushSupported } from '../lib/push';
 
 export type NotifState = NotificationPermission | 'unsupported';
 
@@ -11,6 +12,11 @@ interface Props {
   onCoords: (c: Coords) => void;
   notif: NotifState;
   onEnableNotif: () => void;
+  push: boolean;
+  pushBusy: boolean;
+  pushError: string | null;
+  onTogglePush: (on: boolean) => void;
+  onTestPush: () => void;
   standalone: boolean;
   canInstall: boolean;
   onInstall: () => void;
@@ -20,7 +26,20 @@ const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
 
 
-export function Settings({ coords, onCoords, notif, onEnableNotif, standalone, canInstall, onInstall }: Props) {
+export function Settings({
+  coords,
+  onCoords,
+  notif,
+  onEnableNotif,
+  push,
+  pushBusy,
+  pushError,
+  onTogglePush,
+  onTestPush,
+  standalone,
+  canInstall,
+  onInstall,
+}: Props) {
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
   const [lat, setLat] = useState(String(coords.lat));
@@ -138,9 +157,32 @@ export function Settings({ coords, onCoords, notif, onEnableNotif, standalone, c
         в год, с туманом оказывается каждое шестое, а поймать удаётся 61% туманов. Туман плохо прогнозируется в
         принципе — это уровень научных методик, а не недоработка.
       </p>
-      <p className="fine">
-        Сервера нет, поэтому проверка идёт при открытии приложения, а на Android у установленного приложения ещё и в фоне, раз в несколько часов (как часто, решает браузер).
-      </p>
+      {pushSupported() ? (
+        <div className="push-box">
+          <div className="row">
+            <button className={`btn${push ? ' ghost' : ''}`} onClick={() => onTogglePush(!push)} disabled={pushBusy}>
+              {pushBusy ? 'Минутку…' : push ? 'Отключить рассылку' : 'Присылать, даже когда приложение закрыто'}
+            </button>
+            {push && (
+              <button className="btn ghost" onClick={onTestPush} disabled={pushBusy}>
+                Проверить
+              </button>
+            )}
+          </div>
+          <p className="fine">
+            {push
+              ? 'Сервер сам проверяет прогноз в окна доставки и присылает уведомление, даже если приложение не открывали.'
+              : 'Без этого уведомление приходит, только когда приложение открыто или браузер сам разбудил фоновую проверку — на iPhone такой проверки нет вовсе.'}{' '}
+            На сервер уходят только адрес подписки и координаты, округлённые до километра.
+          </p>
+          {pushError && <p className="error">{pushError}</p>}
+        </div>
+      ) : (
+        <p className="fine">
+          Проверка идёт при открытии приложения, а на Android у установленного приложения ещё и в фоне, раз в несколько
+          часов (как часто, решает браузер).
+        </p>
+      )}
 
       {!standalone && (
         <>
